@@ -1,16 +1,13 @@
-
-
 import streamlit as st
 import pandas as pd
 import pickle
 import xmlrpc.client
 from sklearn.linear_model import LinearRegression
 
-st.title("Odoo ML App")
+st.title("Odoo ML App (Fixed fields)")
 
 # --- Cấu hình Odoo ---
-# Thay URL bằng Odoo online hoặc URL ngrok nếu local
-url = "https://brenton-chevronny-kristi.ngrok-free.dev"  
+url = "https://brenton-chevronny-kristi.ngrok-free.dev"  # Odoo online hoặc ngrok
 db = "Odoo"           
 username = "23070615@vnu.edu.vn"       
 password = "Dothiphuong99"    
@@ -20,7 +17,7 @@ try:
     common = xmlrpc.client.ServerProxy(f"{url}/xmlrpc/2/common")
     uid = common.authenticate(db, username, password, {})
     if uid is None:
-        st.error("Authentication failed. Kiểm tra username/password/database")
+        st.error("Authentication failed")
         st.stop()
     models = xmlrpc.client.ServerProxy(f"{url}/xmlrpc/2/object")
 except Exception as e:
@@ -29,10 +26,11 @@ except Exception as e:
 
 # --- Lấy dữ liệu Sales Orders ---
 try:
+    # Lấy name, amount_total, số lượng sản phẩm trong order (order_line)
     sales_orders = models.execute_kw(
         db, uid, password,
         'sale.order', 'search_read',
-        [[]], {'fields': ['name', 'amount_total', 'discount', 'num_products']} 
+        [[]], {'fields': ['name', 'amount_total', 'order_line']}
     )
 except Exception as e:
     st.error(f"Error fetching data: {e}")
@@ -42,12 +40,16 @@ if not sales_orders:
     st.warning("No Sales Orders found")
     st.stop()
 
+# --- Chuyển order_line thành số lượng sản phẩm ---
+for so in sales_orders:
+    so['num_products'] = len(so['order_line'])  # số lượng product lines
+
 df = pd.DataFrame(sales_orders)
 st.subheader("Sales Orders từ Odoo")
-st.dataframe(df)
+st.dataframe(df[['name','amount_total','num_products']])
 
 # --- Train/load model ---
-feature_cols = ['num_products', 'discount']
+feature_cols = ['num_products']
 target_col = 'amount_total'
 
 try:
@@ -65,5 +67,4 @@ except FileNotFoundError:
 df['predicted_amount'] = model.predict(df[feature_cols])
 
 st.subheader("Sales Orders với dự đoán ML")
-st.dataframe(df)
-
+st.dataframe(df[['name','amount_total','num_products','predicted_amount']])
