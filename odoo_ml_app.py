@@ -8,7 +8,7 @@ from sklearn.linear_model import LinearRegression
 # --------------------------
 # Cấu hình Odoo
 # --------------------------
-url = "http://localhost:8069"
+url = "https://brenton-chevronny-kristi.ngrok-free.dev"
 db = "Odoo"
 username = "23070615@vnu.edu.vn"         # Administrator user
 password = "Dothiphuong99" # Thay bằng password admin thật
@@ -86,3 +86,4 @@ st.dataframe(df_sales)
 
 st.subheader("Inventory / Stock Picking")
 st.dataframe(df_stock)
+
