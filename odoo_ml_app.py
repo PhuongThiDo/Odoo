@@ -1,9 +1,5 @@
 
----
 
-## **4️⃣ File `odoo_ml_app.py`**
-
-```python
 import streamlit as st
 import pandas as pd
 import pickle
@@ -70,3 +66,4 @@ df['predicted_amount'] = model.predict(df[feature_cols])
 
 st.subheader("Sales Orders với dự đoán ML")
 st.dataframe(df)
+
