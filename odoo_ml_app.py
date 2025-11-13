@@ -48,23 +48,19 @@ df = pd.DataFrame(sales_orders)
 st.subheader("Sales Orders từ Odoo")
 st.dataframe(df[['name','amount_total','num_products']])
 
-# --- Train/load model ---
+# --- Train model luôn từ dữ liệu Odoo ---
 feature_cols = ['num_products']
 target_col = 'amount_total'
 
-try:
-    with open("model.pkl", "rb") as f:
-        model = pickle.load(f)
-except FileNotFoundError:
-    st.warning("Model chưa có, train Linear Regression từ dữ liệu Odoo")
-    model = LinearRegression()
-    model.fit(df[feature_cols], df[target_col])
-    with open("model.pkl", "wb") as f:
-        pickle.dump(model, f)
-    st.success("Đã train và lưu model.pkl")
+model = LinearRegression()
+model.fit(df[feature_cols], df[target_col])
 
-# --- Dự đoán ---
+# Tùy chọn lưu model.pkl
+with open("model.pkl", "wb") as f:
+    pickle.dump(model, f)
+
 df['predicted_amount'] = model.predict(df[feature_cols])
-
 st.subheader("Sales Orders với dự đoán ML")
 st.dataframe(df[['name','amount_total','num_products','predicted_amount']])
+
+
