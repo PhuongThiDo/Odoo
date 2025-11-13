@@ -1,89 +1,72 @@
-# odoo_ml_app.py
-import xmlrpc.client
+
+---
+
+## **4️⃣ File `odoo_ml_app.py`**
+
+```python
+import streamlit as st
 import pandas as pd
 import pickle
-import streamlit as st
+import xmlrpc.client
 from sklearn.linear_model import LinearRegression
 
-# --------------------------
-# Cấu hình Odoo
-# --------------------------
-url = "https://brenton-chevronny-kristi.ngrok-free.dev"
-db = "Odoo"
-username = "23070615@vnu.edu.vn"         # Administrator user
-password = "Dothiphuong99" # Thay bằng password admin thật
+st.title("Odoo ML App")
 
-# --------------------------
-# Kết nối Odoo qua XML-RPC
-# --------------------------
-common = xmlrpc.client.ServerProxy(f'{url}/xmlrpc/2/common')
-uid = common.authenticate(db, username, password, {})
-if not uid:
-    st.error("Đăng nhập thất bại. Kiểm tra username/password.")
+# --- Cấu hình Odoo ---
+# Thay URL bằng Odoo online hoặc URL ngrok nếu local
+url = "https://brenton-chevronny-kristi.ngrok-free.dev"  
+db = "Odoo"           
+username = "23070615@vnu.edu.vn"       
+password = "Dothiphuong99"    
+
+# --- Kết nối Odoo ---
+try:
+    common = xmlrpc.client.ServerProxy(f"{url}/xmlrpc/2/common")
+    uid = common.authenticate(db, username, password, {})
+    if uid is None:
+        st.error("Authentication failed. Kiểm tra username/password/database")
+        st.stop()
+    models = xmlrpc.client.ServerProxy(f"{url}/xmlrpc/2/object")
+except Exception as e:
+    st.error(f"Cannot connect to Odoo: {e}")
     st.stop()
 
-models = xmlrpc.client.ServerProxy(f'{url}/xmlrpc/2/object')
-
-# --------------------------
-# Lấy dữ liệu Sale Order
-# --------------------------
-sale_orders = models.execute_kw(
-    db, uid, password,
-    'sale.order', 'search_read',
-    [[]],
-    {'fields': ['name','partner_id','amount_total','date_order'], 'limit': 50}
-)
-
-df_sales = pd.DataFrame(sale_orders)
-if not df_sales.empty and 'partner_id' in df_sales.columns:
-    df_sales['partner_name'] = df_sales['partner_id'].apply(lambda x: x[1] if isinstance(x, list) else x)
-    df_sales.drop(columns=['partner_id'], inplace=True)
-
-# --------------------------
-# Lấy dữ liệu Inventory / Stock Picking
-# --------------------------
-stock_pickings = models.execute_kw(
-    db, uid, password,
-    'stock.picking', 'search_read',
-    [[]],
-    {'fields': ['name','partner_id','state','scheduled_date'], 'limit': 50}
-)
-
-df_stock = pd.DataFrame(stock_pickings)
-if not df_stock.empty and 'partner_id' in df_stock.columns:
-    df_stock['partner_name'] = df_stock['partner_id'].apply(lambda x: x[1] if isinstance(x, list) else x)
-    df_stock.drop(columns=['partner_id'], inplace=True)
-
-# --------------------------
-# Tạo model ML demo (Linear Regression)
-# --------------------------
-# Nếu bạn chưa có model.pkl, tạo model test
+# --- Lấy dữ liệu Sales Orders ---
 try:
-    with open("model.pkl","rb") as f:
+    sales_orders = models.execute_kw(
+        db, uid, password,
+        'sale.order', 'search_read',
+        [[]], {'fields': ['name', 'amount_total', 'discount', 'num_products']} 
+    )
+except Exception as e:
+    st.error(f"Error fetching data: {e}")
+    st.stop()
+
+if not sales_orders:
+    st.warning("No Sales Orders found")
+    st.stop()
+
+df = pd.DataFrame(sales_orders)
+st.subheader("Sales Orders từ Odoo")
+st.dataframe(df)
+
+# --- Train/load model ---
+feature_cols = ['num_products', 'discount']
+target_col = 'amount_total'
+
+try:
+    with open("model.pkl", "rb") as f:
         model = pickle.load(f)
 except FileNotFoundError:
-    X = df_sales[['amount_total']] if 'amount_total' in df_sales.columns else pd.DataFrame([[0],[1],[2]])
-    y = X * 1.1  # giả lập prediction
+    st.warning("Model chưa có, train Linear Regression từ dữ liệu Odoo")
     model = LinearRegression()
-    model.fit(X,y)
-    with open("model.pkl","wb") as f:
-        pickle.dump(model,f)
+    model.fit(df[feature_cols], df[target_col])
+    with open("model.pkl", "wb") as f:
+        pickle.dump(model, f)
+    st.success("Đã train và lưu model.pkl")
 
-# --------------------------
-# Chạy dự đoán
-# --------------------------
-if 'amount_total' in df_sales.columns:
-    X = df_sales[['amount_total']]
-    df_sales['prediction'] = model.predict(X)
+# --- Dự đoán ---
+df['predicted_amount'] = model.predict(df[feature_cols])
 
-# --------------------------
-# Hiển thị bằng Streamlit
-# --------------------------
-st.title("Odoo ML Integration App")
-
-st.subheader("Sales Orders")
-st.dataframe(df_sales)
-
-st.subheader("Inventory / Stock Picking")
-st.dataframe(df_stock)
-
+st.subheader("Sales Orders với dự đoán ML")
+st.dataframe(df)
